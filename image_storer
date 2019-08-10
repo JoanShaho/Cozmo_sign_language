@@ -1,0 +1,65 @@
+
+'''
+Store the current immage that cozmo is looking at
+'''
+
+import sys
+import time
+import asyncio
+import numpy as np
+from PIL import Image
+import cozmo
+
+
+'''
+Pre-made method made by Anki for getting cozmo in the right position
+'''
+def get_in_position(robot: cozmo.robot.Robot):
+    '''If necessary, Move Cozmo's Head and Lift to make it easy to see Cozmo's face.'''
+    if (robot.lift_height.distance_mm > 45) or (robot.head_angle.degrees < 40):
+        with robot.perform_off_charger():
+            lift_action = robot.set_lift_height(0.0, in_parallel=True)
+            head_action = robot.set_head_angle(cozmo.robot.MAX_HEAD_ANGLE,
+                                               in_parallel=True)
+            lift_action.wait_for_completed()
+            head_action.wait_for_completed()
+
+
+
+'''
+Main method for saving the latest image
+'''
+def cozmo_store_image(robot: cozmo.robot.Robot):
+    robot.camera.image_stream_enabled = True
+    Letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M',
+           'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y']
+    # get cozmo in position
+    get_in_position(robot)
+
+    print("Press CTRL-C to quit")
+    counter = 0
+
+    for letter in Letters:
+        # take 1000 pictures with cozmo's camera
+        while counter < 1000:
+            # time interval between each photo that is saved
+            duration_s = 0.05
+
+            # store the latest image cozmo saw
+            latest_image = robot.world.latest_image
+
+            if latest_image is not None:
+                # save the image in the local directory
+                img = latest_image.annotate_image().transpose(Image.FLIP_LEFT_RIGHT)
+                img.save("images/" + letter + "/img%d.jpg" % counter)
+                asyncio.get_event_loop().stop()
+
+            # wait before taing the next image
+            time.sleep(duration_s)
+            counter += 1
+
+# have cozmo stay on his charger
+cozmo.robot.Robot.drive_off_charger_on_connect = False
+
+# run the program
+cozmo.run_program(cozmo_face_mirror)

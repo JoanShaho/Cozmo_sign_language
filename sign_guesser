@@ -1,0 +1,65 @@
+'''
+Have cozmo guess sign language hand signs
+'''
+
+import sys
+import time
+import asyncio
+import tensorflow
+import keras
+import numpy as np
+from PIL import Image
+import cozmo
+
+
+'''
+Pre-made method made by Anki for getting cozmo in the right position
+'''
+def get_in_position(robot: cozmo.robot.Robot):
+    '''If necessary, Move Cozmo's Head and Lift to make it easy to see Cozmo's face.'''
+    if (robot.lift_height.distance_mm > 45) or (robot.head_angle.degrees < 40):
+        with robot.perform_off_charger():
+            lift_action = robot.set_lift_height(0.0, in_parallel=True)
+            head_action = robot.set_head_angle(cozmo.robot.MAX_HEAD_ANGLE,
+                                               in_parallel=True)
+            lift_action.wait_for_completed()
+            head_action.wait_for_completed()
+
+
+'''
+Main guessing method for cozmo
+'''
+def cozmo_sign_guesser(robot: cozmo.robot.Robot
+    # store the latest image cozmo sees
+    robot.camera.image_stream_enabled = True
+
+    # get cozmo in position
+    get_in_position(robot)
+
+    print("Press CTRL-C to quit")
+
+    # load the CNN model
+    model = keras.models.load_model('complex_cozmo_model.h5')
+    Letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M',
+               'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y']
+    while True:
+        # time interval between each picture
+        duration_s = 0.05
+
+        latest_image = robot.world.latest_image
+
+        if latest_image is not None:
+            img = latest_image.annotate_image().transpose(Image.FLIP_LEFT_RIGHT)
+            # get the model prediction
+            sign = np.array([x[0] for x in list(img.resize((160, 120)).getdata())]).reshape(1, 160, 120, 1)
+            index = list(model.predict(sign)[0]).index(int(max(model.predict(sign)[0])))
+
+            # have cozmo say the predicted letter
+            robot.say_text(Letters[index]).wait_for_completed()
+            asyncio.get_event_loop().stop()
+
+
+        time.sleep(duration_s)
+
+cozmo.robot.Robot.drive_off_charger_on_connect = False  # Cozmo can stay on his charger for this example
+cozmo.run_program(cozmo_sign_language)

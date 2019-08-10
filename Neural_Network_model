@@ -1,0 +1,72 @@
+'''
+Method for loading the stored images and create the Convolutional Neural Network
+This code was used in Google Colab notebook and the images were loaded from
+the google drive
+'''
+
+import matplotlib.pyplot as plt
+import io
+from PIL import Image
+import numpy as np
+import csv
+import time
+import tensorflow as tf
+import keras
+
+counters = [i for i in range(1000)]
+Letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M',
+           'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y']
+labeled_imgs = []
+
+# load all the images and at the same time label them
+for l in range(len(Letters)):
+  def func(counter):
+      with open("drive/My Drive/Colab Notebooks/images/"+Letters[l]+"/img%d.jpg" % counter, 'rb') as inf:
+        labeled_imgs.append((np.array([x[0] for x in list(Image.open(inf).resize((160, 120)).getdata())]).reshape(120, 160), l))
+
+  list(map(func, counters))
+  print(Letters[l])
+
+# randomly shuffle the labeled images
+np.random.shuffle(labeled_imgs)
+
+# use the first 20000 images for training and the last 4000 for testing
+train_imgs = [x[0] for x in labeled_imgs[:20000]]
+train_labeles = [x[1] for x in labeled_imgs[:20000]]
+test_imgs = [y[0] for y in labeled_imgs[20000:]]
+test_labeles = [y[1] for y in labeled_imgs[20000:]]
+
+from keras.models import Sequential
+from keras.layers import Flatten, Dense, Conv2D, MaxPooling2D, Dropout
+from keras.utils import to_categorical
+
+# reshape and normalize the images
+train_imgs = np.reshape(train_imgs, (20000, 160, 120, 1)) / 255.0
+test_imgs = np.reshape(test_imgs, (4000, 160, 120, 1)) / 255.0
+
+# build the architecture of the model
+model = Sequential()
+model.add(Conv2D(64, kernel_size=(5,5), activation = 'relu', input_shape=(160, 120 ,1) ))
+model.add(Conv2D(64, kernel_size=(5,5), activation = 'relu'))
+model.add(Conv2D(64, kernel_size=(4,4), activation = 'relu'))
+model.add(MaxPooling2D(pool_size = (3, 3)))
+model.add(Conv2D(64, kernel_size=(4,4), activation = 'relu'))
+model.add(Conv2D(64, kernel_size=(3,3), activation = 'relu'))
+model.add(Conv2D(64, kernel_size=(3,3), activation = 'relu'))
+model.add(MaxPooling2D(pool_size = (3, 3)))
+model.add(Flatten())
+model.add(Dense(128, activation = 'relu'))
+model.add(Dense(24, activation = 'softmax'))
+
+# print the model details
+print(model.summary())
+
+# compile the model and start the training
+model.compile(optimizer="adam", loss="sparse_categorical_crossentropy",
+             metrics=["accuracy"])
+
+model.fit(train_imgs, train_labeles,
+          validation_data=(test_imgs, test_labeles), epochs=5)
+
+# save the trainined model
+model.save('complex_cozmo_model.h5')
